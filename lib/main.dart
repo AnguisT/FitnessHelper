@@ -27,8 +27,9 @@ HttpClient httpClient = new HttpClient();
 void main() {
   runApp(
     new MaterialApp(
+      title: 'Fitnes Helper',
       // home: new Login(),
-      
+      debugShowCheckedModeBanner: false,
       routes: <String, WidgetBuilder> {
         '/': (BuildContext context) => new Login(),
         '/home': (BuildContext context) => new HomePage(),
@@ -63,7 +64,6 @@ class _HomePage extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    dbProvider.create();
     getSharedPreferences();
   }
 
@@ -150,7 +150,7 @@ class _HomePage extends State<HomePage> {
           children: <Widget>[
             new ListTile(
               title: new Text(item.title),
-              selected: item.checked,
+              trailing: item.checked ? new Icon(Icons.check_box, color: Colors.blue) : new Icon(Icons.check_box_outline_blank, color: Colors.blue),
               onTap: () {
                 showDialog(
                   context: context,
@@ -164,7 +164,7 @@ class _HomePage extends State<HomePage> {
                           Navigator.of(context).pop();
                         },
                       ),
-                      item.checked ? addInBasket : removeInBasket
+                      !item.checked ? addInBasket : removeInBasket
                     ],
                   )
                 );

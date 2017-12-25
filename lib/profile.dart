@@ -39,6 +39,8 @@ List<DescProfile> listProfile = <DescProfile>[
   new DescProfile(title: '', value: ''),
   new DescProfile(title: '', value: ''),
   new DescProfile(title: '', value: ''),
+  new DescProfile(title: '', value: ''),
+  new DescProfile(title: '', value: ''),
 ];
 
 class Profile extends StatefulWidget {
@@ -53,7 +55,11 @@ class _Profile extends State<Profile> {
   DescProfile descProfile;
   String authToken = '';
   String authSecret = '';
+  String idUser = '';
+  String login = '';
+  int idtypeexercise = 0;
   double lastWeightKg;
+  bool isSave = false;
 
   @override
   void initState() {
@@ -64,33 +70,45 @@ class _Profile extends State<Profile> {
   }
   
   getDetailProfile() {
-    httpClient.getProfile(authToken, authSecret).then((profile) {
-      listProfile.clear();
-      setState(() {
-        listProfile.add(new DescProfile(
-          title: 'Height measure: ',
-          value: profile['height_measure']
-        ));
-        listProfile.add(new DescProfile(
-          title: 'Weight measure: ',
-          value: profile['weight_measure']
-        ));
-        listProfile.add(new DescProfile(
-          title: 'Last weight kg: ',
-          value: double.parse(profile['last_weight_kg'])
-        ));
-        listProfile.add(new DescProfile(
-          title: 'Goal weight kg: ',
-          value: double.parse(profile['goal_weight_kg'])
-        ));
-        listProfile.add(new DescProfile(
-          title: 'Height cm: ',
-          value: double.parse(profile['height_cm'])
-        ));
+    httpClient.getUserByLogin(login).then((user) {
+      httpClient.getProfile(authToken, authSecret).then((profile) {
+        listProfile.clear();
+        setState(() {
+          listProfile.add(new DescProfile(
+            title: 'Height measure: ',
+            value: profile['height_measure']
+          ));
+          listProfile.add(new DescProfile(
+            title: 'Weight measure: ',
+            value: profile['weight_measure']
+          ));
+          listProfile.add(new DescProfile(
+            title: 'Last weight kg: ',
+            value: double.parse(profile['last_weight_kg'])
+          ));
+          listProfile.add(new DescProfile(
+            title: 'Goal weight kg: ',
+            value: double.parse(profile['goal_weight_kg'])
+          ));
+          listProfile.add(new DescProfile(
+            title: 'Height cm: ',
+            value: double.parse(profile['height_cm'])
+          ));
+          listProfile.add(new DescProfile(
+            title: 'Calories norm: ',
+            value: user[0]['caloriesnorm']
+          ));
+          listProfile.add(new DescProfile(
+            title: 'Reset calories: ',
+            value: user[0]['resetcalories']
+          ));
+        });
+        lastWeightKg = double.parse(profile['last_weight_kg']);
+        controllerWeight.text = lastWeightKg.toString();
+        controllerCaloriesNorm.text = user[0]['caloriesnorm'].toString();
+        controllerResetCalories.text = user[0]['resetcalories'].toString();
+        print(listProfile);
       });
-      lastWeightKg = double.parse(profile['last_weight_kg']);
-      controllerWeight.text = lastWeightKg.toString();
-      print(listProfile);
     });
   }
 
@@ -98,9 +116,23 @@ class _Profile extends State<Profile> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     authToken = prefs.getString('auth_token');
     authSecret = prefs.getString('auth_secret');
+    login = prefs.getString('login');
+    idUser = prefs.getInt('userid').toString();
+    idtypeexercise = prefs.getInt('idtypeexercise');
+    setState(() {
+      _selectedItem = idtypeexercise - 1;
+    });
+  }
+
+  _saveValues() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.setInt('idtypeexercise', _selectedItem + 1);
+    getDetailProfile();
   }
 
   TextEditingController controllerWeight = new TextEditingController();
+  TextEditingController controllerCaloriesNorm = new TextEditingController();
+  TextEditingController controllerResetCalories = new TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -139,6 +171,7 @@ class _Profile extends State<Profile> {
           margin: const EdgeInsets.only(left: 10.0),
           child: new ListTile(
             title: new Text(listProfile[2].title + listProfile[2].value.toString()),
+            trailing: new Icon(Icons.edit),
             onTap: () {
               showDialog(
                 context: context,
@@ -197,6 +230,7 @@ class _Profile extends State<Profile> {
                         httpClient.updtaeWeight(authToken, authSecret, controllerWeight.text).then((val) {
                           print(val);
                           Navigator.pop(context);
+                          getDetailProfile();
                         });
                       },
                     ),
@@ -220,8 +254,101 @@ class _Profile extends State<Profile> {
             title: new Text(listProfile[4].title + listProfile[4].value.toString()),
           )
         ),
-        new Divider(),        
+        new Divider(),
+        new Container(
+          margin: const EdgeInsets.only(left: 10.0),
+          child: new ListTile(
+            title: new Text(listProfile[5].title + listProfile[5].value.toString()),
+            trailing: new Icon(Icons.edit),
+            onTap: () {
+              showDialog(
+                context: context,
+                child: new AlertDialog(
+                  title: new Text('Editing calories norm'),
+                  content: new Container(
+                    child: new Container(
+                      child: new TextField(
+                        textAlign: TextAlign.center,
+                        controller: controllerCaloriesNorm,
+                        keyboardType: TextInputType.number,
+                        decoration: new InputDecoration(
+                          hintText: 'New your calories norm',
+                        ),
+                      ),
+                    ),
+                  ),
+                  actions: <Widget> [
+                    new FlatButton(
+                      child: new Text('Cancel'),
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                    ),
+                    new FlatButton(
+                      child: new Text('OK'),
+                      onPressed: () {
+                        httpClient.updateCaloriesNorm(controllerCaloriesNorm.text, idUser).then((val) {
+                          print(val);
+                          Navigator.pop(context);
+                          getDetailProfile();
+                        });
+                      },
+                    ),
+                  ]
+                )
+              );
+            },
+          )
+        ),
+        new Divider(),
+        new Container(
+          margin: const EdgeInsets.only(left: 10.0),
+          child: new ListTile(
+            title: new Text(listProfile[6].title + listProfile[6].value.toString()),
+            trailing: new Icon(Icons.edit),
+            onTap: () {
+              showDialog(
+                context: context,
+                child: new AlertDialog(
+                  title: new Text('Editing reset calories'),
+                  content: new Container(
+                    child: new Container(
+                      child: new TextField(
+                        textAlign: TextAlign.center,
+                        controller: controllerResetCalories,
+                        keyboardType: TextInputType.number,
+                        decoration: new InputDecoration(
+                          hintText: 'New your reset calories',
+                        ),
+                      ),
+                    ),
+                  ),
+                  actions: <Widget> [
+                    new FlatButton(
+                      child: new Text('Cancel'),
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                    ),
+                    new FlatButton(
+                      child: new Text('OK'),
+                      onPressed: () {
+                        httpClient.updateResetCalories(controllerResetCalories.text, idUser).then((val) {
+                          print(val);
+                          Navigator.pop(context);
+                          getDetailProfile();
+                        });
+                      },
+                    ),
+                  ]
+                )
+              );
+            },
+          )
+        ),
+        new Divider(),
         new ExpansionTile(
+          initiallyExpanded: isSave,
           title: const Text('Type exercise'),
           children: <Widget>[
             new RadioListTile<int>(
@@ -274,7 +401,13 @@ class _Profile extends State<Profile> {
                         )
                       ),
                       onPressed: () {
-                        
+                        httpClient.updateIdTypeExercise(_selectedItem + 1, idUser).then((val) {
+                          setState(() {
+                            isSave = false;
+                            _selectedItem = val[0]['idtypeexercise'] - 1;
+                          });
+                          _saveValues();
+                        });
                       },
                     ),
                   ),

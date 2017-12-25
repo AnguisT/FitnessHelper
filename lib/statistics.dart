@@ -18,7 +18,6 @@ class Statisctics extends StatefulWidget {
 
 class _Statisctics extends State<Statisctics> with SingleTickerProviderStateMixin {
 
-  DBProvider dbProvider = new DBProvider();
   HttpClient httpClient = new HttpClient();
 
   LineChartOptions _lineCaloriesChartOptions;
@@ -38,17 +37,18 @@ class _Statisctics extends State<Statisctics> with SingleTickerProviderStateMixi
   String authSecret = '';
 
   bool isLoadedCalorLine = false;
+  bool dataCalor = true;
   bool isLoadedWeightLine = false;
+  bool dataWeight = true;
   bool isLoadedVertical = false;
+  bool dataVertcial = true;
 
   @override
   void initState() {
     super.initState();
     controller = new TabController(length: 3, vsync: this);
-    dbProvider.create().then((onValue) {
-      setState(() {
-        verticalData();
-      });
+    setState(() {
+      verticalData();
     });
     getSharedPreferences();
   }
@@ -71,43 +71,55 @@ class _Statisctics extends State<Statisctics> with SingleTickerProviderStateMixi
     var val;
     listRowsCalorVertical.clear();
     listCalorVertical.clear();
-    await dbProvider.getStatisticsByDate(dateToday).then((stat) {
+    await httpClient.getStatisticsByDate(dateToday).then((stat) {
       val = stat;
     });
-    await dbProvider.getCaloriesByIdStatistics(val[0]['idstatistics']).then((calor) {
-      for (int j = 0; j < calor.length; j++) {
-        listCalorVertical.add(double.parse(calor[j]['caloriescount'].toString()));
-      }
-    });
+    if (val.isNotEmpty) {
+      await httpClient.getCaloriesByIdStatistics(val[0]['statisticsid']).then((calor) {
+        for (int j = 0; j < calor.length; j++) {
+          listCalorVertical.add(double.parse(calor[j]['caloriescount'].toString()));
+        }
+      });
+    }
   }
 
   verticalData() async {
+    setState(() {
+      dataVertcial = false;
+      isLoadedVertical = false;
+    });
+  
     _verticalBarChartOptions = new VerticalBarChartOptions();
     _chartDataVertical = new ChartData();
 
     await addRowsVertical();
 
-    print(listRowsCalorVertical);
+    if (listCalorVertical.isNotEmpty) {
+      print(listRowsCalorVertical);
 
-    listYLabelsCalorVertical.clear();
+      listYLabelsCalorVertical.clear();
 
-    for (int i = 0; i < listCalorVertical.length; i++) {
-      var asd = <double>[];
-      asd.add(listCalorVertical[i]);
-      listRowsCalorVertical.add(asd);
-      listYLabelsCalorVertical.add(listCalorVertical[i].toString());
+      for (int i = 0; i < listCalorVertical.length; i++) {
+        var asd = <double>[];
+        asd.add(listCalorVertical[i]);
+        listRowsCalorVertical.add(asd);
+        listYLabelsCalorVertical.add(listCalorVertical[i].toString());
+      }
+
+      print(listYLabelsCalorVertical);
+
+      _chartDataVertical.dataRowsLegends = listYLabelsCalorVertical;
+
+      _chartDataVertical.dataRows = listRowsCalorVertical;
+
+      _chartDataVertical.xLabels =  [new DateFormat('yyyy-MM-dd').format(new DateTime.now())];
+      _chartDataVertical.assignDataRowsDefaultColors();
+      setState(() {
+        isLoadedVertical = true;
+      });
     }
-
-    print(listYLabelsCalorVertical);
-
-    _chartDataVertical.dataRowsLegends = listYLabelsCalorVertical;
-
-    _chartDataVertical.dataRows = listRowsCalorVertical;
-
-    _chartDataVertical.xLabels =  [new DateFormat('yyyy-MM-dd').format(new DateTime.now())];
-    _chartDataVertical.assignDataRowsDefaultColors();
     setState(() {
-      isLoadedVertical = true;
+      dataVertcial = true;
     });
   }
 
@@ -124,12 +136,14 @@ class _Statisctics extends State<Statisctics> with SingleTickerProviderStateMixi
     String dateF = dateFormat.format(fromDate);
     String dateT = dateFormat.format(toDate);
     var val;
-    await dbProvider.getStatisticsByCustomDate(dateF, dateT).then((stat) {
+    print(dateF + '; ' + dateT);
+    await httpClient.getStatisticsByCustomDate(dateF, dateT).then((stat) {
       val = stat;
     });
     for (int i = 0; i < val.length; i++) {
       sumCalor = 0.0;
-      await dbProvider.getCaloriesByIdStatistics(val[i]['idstatistics']).then((calor) {
+      print(val[i]['statisticsid']);
+      await httpClient.getCaloriesByIdStatistics(val[i]['statisticsid'].toString()).then((calor) {
         for (int j = 0; j < calor.length; j++) {
           sumCalor += double.parse(calor[j]['caloriescount'].toString());
         }
@@ -143,6 +157,10 @@ class _Statisctics extends State<Statisctics> with SingleTickerProviderStateMixi
   }
 
   lineCaloriesData() async {
+    setState(() {
+      dataCalor = false;
+      isLoadedCalorLine = false;
+    });
     _lineCaloriesChartOptions = new LineChartOptions();
     _chartDataLineCalories = new ChartData();
 
@@ -170,6 +188,7 @@ class _Statisctics extends State<Statisctics> with SingleTickerProviderStateMixi
 
     _chartDataLineCalories.assignDataRowsDefaultColors();
     setState(() {
+      dataCalor = true;
       isLoadedCalorLine = true;
     });
   }
@@ -180,6 +199,10 @@ class _Statisctics extends State<Statisctics> with SingleTickerProviderStateMixi
   List<String> listYLabelsWidthLine = <String>[];
 
   lineWeightData() async {
+    setState(() {
+      dataWeight = false;
+      isLoadedWeightLine = false;
+    });
     listWidthLine.clear();
     listXLabelsWidthLine.clear();
     var date1 = new DateTime(1970, 1, 1);
@@ -187,62 +210,93 @@ class _Statisctics extends State<Statisctics> with SingleTickerProviderStateMixi
     var dur = date2.difference(date1);
     print('date: ' + dur.inDays.toString());
     await httpClient.getWidthMonth(authToken, authSecret, dur.inDays).then((widthMonth) {
-      print(widthMonth);
-      var listWidth = widthMonth['month']['day'];
-      print(listWidth);      
-      for (int i = 0; i < listWidth.length; i++) {
-        var oldDate = new DateTime(1970, 1, 1);
-        String newDate;
-        newDate = new DateFormat('yyyy-MM-dd').format(oldDate.add(new Duration(days: int.parse(listWidth[i]['date_int']))));
-        String strNewDate = newDate.substring(newDate.lastIndexOf('-') + 1, newDate.length);
-        listWidthLine.add(double.parse(listWidth[i]['weight_kg']));
-        listXLabelsWidthLine.add(strNewDate);
+      if (widthMonth['month'].length > 2) {
+        print(widthMonth);
+        var listWidth = widthMonth['month']['day'];
+        print(listWidth);      
+        for (int i = 0; i < listWidth.length; i++) {
+          var oldDate = new DateTime(1970, 1, 1);
+          String newDate;
+          newDate = new DateFormat('yyyy-MM-dd').format(oldDate.add(new Duration(days: int.parse(listWidth[i]['date_int']))));
+          String strNewDate = newDate.substring(newDate.lastIndexOf('-') + 1, newDate.length);
+          listWidthLine.add(double.parse(listWidth[i]['weight_kg']));
+          listXLabelsWidthLine.add(strNewDate);
+        }
+        print(listWidthLine);
       }
-      print(listWidthLine);
     });
 
-    var asd = date1.add(new Duration(days: 17504));
-    print(asd);
+    if (listWidthLine.isNotEmpty) {
+      _lineWeightChartOptions = new LineChartOptions();
+      _chartDataLineWeight = new ChartData();
 
-    _lineWeightChartOptions = new LineChartOptions();
-    _chartDataLineWeight = new ChartData();
+      _chartDataLineWeight.dataRowsLegends = ["Width"];
 
-    _chartDataLineWeight.dataRowsLegends = ["Width"];
+      listRowsWidthLine.clear();
 
-    // await addRowsWidthLine();
+      listRowsWidthLine.add(listWidthLine);    
 
-    listRowsWidthLine.clear();
+      _chartDataLineWeight.dataRows = listRowsWidthLine;
+      _chartDataLineWeight.xLabels = listXLabelsWidthLine;
 
-    listRowsWidthLine.add(listWidthLine);    
+      _lineWeightChartOptions.useUserProvidedYLabels = true;
 
-    _chartDataLineWeight.dataRows = listRowsWidthLine;
-    _chartDataLineWeight.xLabels = listXLabelsWidthLine;
+      double min = _chartDataLineWeight.minData();
+      double max = _chartDataLineWeight.maxData();
+      double result = (max + min) / 2;
+      double medium = double.parse(new NumberFormat("##.##").format(result));
 
-    _lineWeightChartOptions.useUserProvidedYLabels = true;
+      listYLabelsWidthLine.clear();
+      listYLabelsWidthLine.add(min.toString());
+      listYLabelsWidthLine.add(medium.toString());
+      listYLabelsWidthLine.add(max.toString());
 
-    double min = _chartDataLineWeight.minData();
-    double max = _chartDataLineWeight.maxData();
-    double result = (max + min) / 2;
-    double medium = double.parse(new NumberFormat("##.##").format(result));
+      _chartDataLineWeight.yLabels = listYLabelsWidthLine;
 
-    listYLabelsWidthLine.clear();
-    listYLabelsWidthLine.add(min.toString());
-    listYLabelsWidthLine.add(medium.toString());
-    listYLabelsWidthLine.add(max.toString());
-
-    _chartDataLineWeight.yLabels = listYLabelsWidthLine;
-
-    _chartDataLineWeight.assignDataRowsDefaultColors();
-
+      _chartDataLineWeight.assignDataRowsDefaultColors();
+      setState(() {
+        isLoadedWeightLine = true;
+      });
+    }
     setState(() {
-      isLoadedWeightLine = true;
+      dataWeight= true;
     });
   }
 
   @override
   Widget build(BuildContext context) {
 
-    var defaultPage = new Container();
+    var progress = new Container(
+      child: new Center(
+        child: new SizedBox(
+          height: 50.0,
+          width: 50.0,
+          child: new CircularProgressIndicator(
+            value: null,
+            strokeWidth: 7.0,
+          ),
+        ),
+      ),
+    );
+
+    // dataCalor
+    var defaultPageCalor = dataCalor ? new Container(
+      child: new Center(
+        child: new Text('No data to plot chart'),
+      )
+    ) : progress;
+
+    var defaultPageWeight = dataWeight ? new Container(
+      child: new Center(
+        child: new Text('No data to plot chart'),
+      )
+    ) : progress;
+
+    var defaultPageVertical = dataVertcial ? new Container(
+      child: new Center(
+        child: new Text('No data to plot chart'),
+      )
+    ) : progress;
 
     VerticalBarChart vertical = new VerticalBarChart(
       painter: new VerticalBarChartPainter(),
@@ -394,13 +448,14 @@ class _Statisctics extends State<Statisctics> with SingleTickerProviderStateMixi
                     padding: const EdgeInsets.only(top: 10.0, left: 10.0, right: 10.0, bottom: 10.0),
                     child: new Container(
                       width: MediaQuery.of(context).size.width,
-                      child: new RaisedButton(
+                      child: !dataCalor ? new Container() : new RaisedButton(
                         child: new Text('Show'),
                         color: Colors.teal,
                         onPressed: () {
-                          var fd = new DateFormat('yyyy-MM-dd').format(fromDate);
-                          var td = new DateFormat('yyyy-MM-dd').format(toDate);
-                          if (fd != td) {
+                            print(isLoadedCalorLine);
+                            var fd = new DateFormat('yyyy-MM-dd').format(fromDate);
+                            var td = new DateFormat('yyyy-MM-dd').format(toDate);
+                            if (fd != td) {
                             setState(() {
                               lineCaloriesData();
                             });
@@ -412,7 +467,7 @@ class _Statisctics extends State<Statisctics> with SingleTickerProviderStateMixi
                   new Expanded(
                     child: new Container(
                       width: MediaQuery.of(context).size.width,
-                      child: isLoadedCalorLine ? linerCalories : defaultPage,
+                      child: isLoadedCalorLine ? linerCalories : defaultPageCalor,
                     )
                   ),
                 ],
@@ -427,7 +482,7 @@ class _Statisctics extends State<Statisctics> with SingleTickerProviderStateMixi
                   new Expanded(
                     child: new Container(
                       width: MediaQuery.of(context).size.width,
-                      child: isLoadedVertical ? vertical : defaultPage,
+                      child: isLoadedVertical ? vertical : defaultPageVertical,
                     )
                   ),
                 ],
@@ -494,7 +549,7 @@ class _Statisctics extends State<Statisctics> with SingleTickerProviderStateMixi
                   new Expanded(
                     child: new Container(
                       width: MediaQuery.of(context).size.width,
-                      child: isLoadedWeightLine ? linerWeight : defaultPage,
+                      child: isLoadedWeightLine ? linerWeight : defaultPageWeight,
                     )
                   ),
                 ],

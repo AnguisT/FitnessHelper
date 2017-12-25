@@ -33,10 +33,13 @@ final String customExerciseCalories = "customexercisecalories";
 final String customIdUser = "iduser";
 
 class User {
-  User({this.login, this.password});
+  User({this.login, this.password, this.caloriesnorm, this.resetcalories, this.idtypeexercise});
   int iduser;
   String login;
   String password;
+  int caloriesnorm;
+  int resetcalories;
+  int idtypeexercise;
 
   Map toMap() {
     Map map = {

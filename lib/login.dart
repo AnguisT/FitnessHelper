@@ -4,7 +4,27 @@ import 'httpclient.dart';
 import 'sqldb.dart';
 import 'dart:async';
 
-DBProvider dbProvider = new DBProvider();
+String typeExercise = 'Athletics';
+HttpClient httpClient = new HttpClient();
+TextEditingController _controllerLogin = new TextEditingController();
+TextEditingController _controllerPassword = new TextEditingController();
+TextEditingController _controllerWeight = new TextEditingController();
+TextEditingController _controllerHeight = new TextEditingController();
+TextEditingController _controllerNorm = new TextEditingController();
+TextEditingController _controllerReset = new TextEditingController();
+String loginText = '';
+String passwordText = '';
+int idText = 0; 
+String message = '';
+String authToken = '';
+String authSecret = '';
+bool isLoaded = false;
+bool error = false;
+bool closeDialog = false;
+List<int> idTypeExercise = <int>[];
+List<String> nameTypeExercise = <String>[];
+int typeexerciseid;
+int caloriesnorm;
 
 class Login extends StatefulWidget {
   Login({Key key}) : super(key: key);
@@ -15,29 +35,13 @@ class Login extends StatefulWidget {
 
 class _Login extends State<Login> {
 
-  HttpClient httpClient = new HttpClient();
-  String loginText = '';
-  String passwordText = '';
-  int idText = 0; 
-  String message = '';
-  String authToken = '';
-  String authSecret = '';
-  bool isLoaded = false;
-  bool error = false;
-  bool closeDialog = false;
-
   @override
   void initState() {
     super.initState();
-    _createDB();
     new Future.delayed(new Duration(seconds: 5), () {
       setState(() {
         isLoaded = true;
       });
-    });
-    User user = new User(login: 'Vlad', password: 'vlad');
-    httpClient.newUserFirebase(user).then((onValue) {
-      httpClient.getUserFirebase();
     });
   }
 
@@ -45,19 +49,11 @@ class _Login extends State<Login> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     prefs.setInt('userid', idText);
     prefs.setString('login', loginText);
-    prefs.setString('password', passwordText);
     prefs.setString('auth_token', authToken);
     prefs.setString('auth_secret', authSecret);
+    prefs.setInt('idtypeexercise', typeexerciseid);
+    prefs.setInt('caloriesnorm', caloriesnorm);
   }
-
-  void _createDB() {
-    dbProvider.create();
-  }
-
-  TextEditingController _controllerLogin = new TextEditingController();
-  TextEditingController _controllerPassword = new TextEditingController();
-  TextEditingController _controllerWeight = new TextEditingController();
-  TextEditingController _controllerHeight = new TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -66,146 +62,61 @@ class _Login extends State<Login> {
       Navigator.of(context).pushReplacementNamed('/home');
     }
 
-    Future userDescript() async {
-      AlertDialog alert = new AlertDialog(
-        title: new Text('User Description'),
-        content: new Container(
-          height: 100.0,
-          child: new Column(
-            children: <Widget>[
-              new Container(
-                child: new Row(
-                  children: <Widget>[
-                    new Container(
-                      width: MediaQuery.of(context).size.width * 0.54,
-                      child: new TextField(
-                        controller: _controllerHeight,
-                        keyboardType: TextInputType.number,
-                        decoration: new InputDecoration(
-                          hintText: 'Height'
-                        ),
-                      ),
-                    ),
-                    new Container(
-                      width: MediaQuery.of(context).size.width * 0.1,
-                      child: new Text('cm')
-                    ),
-                  ],
-                )
-              ),
-              new Container(
-                child: new Row(
-                  children: <Widget>[
-                    new Container(
-                      width: MediaQuery.of(context).size.width * 0.54,
-                      child: new TextField(
-                        controller: _controllerWeight,
-                        keyboardType: TextInputType.number,
-                        decoration: new InputDecoration(
-                          hintText: 'Weight'
-                        ),
-                      ),
-                    ),
-                    new Container(
-                      width: MediaQuery.of(context).size.width * 0.1,
-                      child: new Text('kg')
-                    ),
-                  ],
-                ) 
-              ),
-            ],
-          )
-        ),
-        actions: <Widget>[
-          new FlatButton(
-            child: new Text('OK'),
-            onPressed: () {
-              httpClient.newWeightHeight(authToken, authSecret, _controllerHeight.text, _controllerWeight.text).then((status) {
-                Navigator.pop(context);
-                _navigate();
-              });
-            },
-          ),
-        ],
-      );
-      await showDialog(context: context, child: alert);
+    newUser() async {
+      await httpClient.getAllTypeExercise().then((typeexercise) {
+        for (int i = 0; i < typeexercise.length; i++) {
+          nameTypeExercise.add(typeexercise[i]['nametypeexercise']);
+          idTypeExercise.add(typeexercise[i]['typeexerciseid']);
+        }
+      });
+      Navigator.push(context, new MaterialPageRoute(
+        builder: (BuildContext context) => new DescUserDialog(),
+        fullscreenDialog: true,
+      ));
+      // userDescript();
     }
 
     newAccount() {
-      dbProvider.getAllUser().then((users) {
-        if (users != null) {
-          showDialog(
-            context: context,
-            child: new AlertDialog(
-              title: new Text('You have one account'),
-              content: new Text('Create a new account?'),
-              actions: <Widget>[
-                new FlatButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child: new Text('No'),
-                ),
-                new FlatButton(
-                  onPressed: () {
-                    loginText = _controllerLogin.text;
-                    passwordText = _controllerPassword.text;
-                    User user = new User(login: loginText, password: passwordText);
-                    httpClient.newUser(loginText).then((tokens) {
-                      if (tokens != null) {
-                        authToken = tokens['auth_token'];
-                        authSecret = tokens['auth_secret'];
-                        dbProvider.insertUser(user).then((_user) {
-                          idText = _user.iduser;
-                        });
-                        userDescript().then((val) {
-                          Navigator.pop(context);
-                          _navigate();
-                        });
-                      }
-                    });
-                  },
-                  child: new Text('Yes'),
-                ),
-              ],
+      showDialog(
+        context: context,
+        child: new AlertDialog(
+          title: new Text('Do you want to create a new account?'),
+          actions: <Widget>[
+            new FlatButton(
+              child: new Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
             ),
-          );
-        } else {
-          loginText = _controllerLogin.text;
-          passwordText = _controllerPassword.text;
-          User user = new User(login: loginText, password: passwordText);
-          httpClient.newUser(loginText).then((tokens) {
-            if (tokens != null) {
-              dbProvider.insertUser(user).then((_user) {
-                idText = _user.iduser;
-              });
-              authToken = tokens['auth_token'];
-              authSecret = tokens['auth_secret'];
-              _saveValues();
-              userDescript().then((val) {
-                Navigator.pop(context);
-                _navigate();
-              });
-            }
-          });
-        }
-      });
+            new FlatButton(
+              child: new Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                newUser();
+              },
+            ),
+          ]
+        )
+      );
     }
 
     _signInOut() {
       error = false;
       if (_controllerLogin.text.isNotEmpty && _controllerPassword.text.isNotEmpty) {
-        dbProvider.getUserByLogin(_controllerLogin.text).then((_user) {
+        httpClient.getUserByLogin(_controllerLogin.text).then((_user) {
           setState(() {
-            if (_user != null) {
-              loginText = _user.login;
-              passwordText = _user.password;
-              idText = _user.iduser;
-              if (_user.password != _controllerPassword.text) {
+            if (_user.isNotEmpty) {
+              isLoaded = false;
+              loginText = _user[0]['login'];
+              passwordText = _user[0]['password'];
+              idText = _user[0]['userid'];
+              if (_user[0]['password'] != _controllerPassword.text) {
                 error = true;
                 message = 'Login or password is invalid';
               } else {
                 httpClient.getUser(loginText).then((tokens) {
+                  typeexerciseid = _user[0]['idtypeexercise'];
+                  caloriesnorm = _user[0]['caloriesnorm'];
                   authToken = tokens['auth_token'];
                   authSecret = tokens['auth_secret'];
                   _saveValues();
@@ -230,7 +141,7 @@ class _Login extends State<Login> {
     var body = new Scaffold(
       appBar: new AppBar(
         title: new Text('Login'),
-        backgroundColor: Colors.orange,
+        backgroundColor: Colors.blue,
       ),
       body: new Container(
         padding: new EdgeInsets.all(10.0),
@@ -257,7 +168,7 @@ class _Login extends State<Login> {
               child: new Padding(
                 padding: const EdgeInsets.only(top: 10.0),
                 child: new RaisedButton(
-                  color: Colors.orange[200],
+                  color: Colors.blue,
                   child: new Text('Login/SignUp', style: new TextStyle(color: Colors.white)),                
                   onPressed: () {
                     _signInOut();
@@ -285,5 +196,169 @@ class _Login extends State<Login> {
     );
 
     return isLoaded ? body : bodyProgress;
+  }
+}
+
+class DescUserDialog extends StatefulWidget {
+  @override
+  DescUserDialogState createState() => new DescUserDialogState();
+}
+
+class DescUserDialogState extends State<DescUserDialog> {
+
+  Future<bool> _onWillPop() async {
+    return false;
+  }
+
+  void _navigate() {
+    Navigator.of(context).pushReplacementNamed('/home');
+  }
+
+  _saveValues() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.setInt('userid', idText);
+    prefs.setString('login', loginText);
+    prefs.setString('auth_token', authToken);
+    prefs.setString('auth_secret', authSecret);
+    prefs.setInt('typeexerciseid', typeexerciseid);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    saveDesc() {
+      typeexerciseid = nameTypeExercise.indexOf(typeExercise);
+      User user = new User(
+        login: _controllerLogin.text,
+        password: _controllerPassword.text,
+        caloriesnorm: int.parse(_controllerNorm.text),
+        resetcalories: int.parse(_controllerReset.text),
+        idtypeexercise: typeexerciseid + 1
+      );
+      httpClient.newUser(loginText).then((tokens) {
+        if (tokens != null) {
+          httpClient.newUserServer(user).then((value) async {
+            if (value.isNotEmpty) {
+              idText = value[0]['userid'];
+              authToken = tokens['auth_token'];
+              authSecret = tokens['auth_secret'];
+              await _saveValues();
+              httpClient.newWeightHeight(authToken, authSecret, _controllerHeight.text, _controllerWeight.text).then((status) {
+                Navigator.pop(context);
+                _navigate();
+              });
+            }
+          });
+        } else {
+          setState(() {
+            Navigator.pop(context);
+            error = true;
+            message = 'This login is already in use';
+          });
+        }
+      });
+    }
+
+    return new Scaffold(
+      appBar: new AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Description user'),
+        actions: <Widget> [
+          new FlatButton(
+            child: new Text('SAVE', style: theme.textTheme.body1.copyWith(color: Colors.white)),
+            onPressed: () {
+              if (_controllerHeight.text.isNotEmpty && _controllerWeight.text.isNotEmpty && _controllerNorm.text.isNotEmpty && _controllerReset.text.isNotEmpty) {
+                saveDesc();
+              }
+            }
+          )
+        ]
+      ),
+      body: new Form(
+        onWillPop: _onWillPop,
+        child: new ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: <Widget>[
+            new Container(
+              child: new TextField(
+                controller: _controllerHeight,
+                keyboardType: TextInputType.number,
+                decoration: new InputDecoration(
+                  hintText: 'Enter you height',
+                  labelText: 'Height cm',
+                ),
+              ),
+            ),
+            new Container(
+              child: new TextField(
+                controller: _controllerWeight,
+                keyboardType: TextInputType.number,
+                decoration: new InputDecoration(
+                  hintText: 'Enter you weight',
+                  labelText: 'Weight kg',
+                ),
+              ),
+            ),
+            new Container(
+              child: new Container(
+                child: new TextField(
+                  controller: _controllerNorm,
+                  keyboardType: TextInputType.number,
+                  decoration: new InputDecoration(
+                    hintText: 'Enter you calories norm',
+                    labelText: 'Calories norm',
+                  ),
+                ),
+              ),
+            ),
+            new Container(
+              child: new Container(
+                child: new TextField(
+                  controller: _controllerReset,
+                  keyboardType: TextInputType.number,
+                  decoration: new InputDecoration(
+                    hintText: 'Enter the quantity how much you want to lose calories',
+                    labelText: 'Reset norm',
+                  ),
+                ),
+              ),
+            ),
+            new DropdownButtonHideUnderline(
+              child: new InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Type exercise',
+                  hintText: 'Choose an type exercise',
+                ),
+                isEmpty: typeExercise == null,
+                child: new DropdownButton<String>(
+                  value: typeExercise,
+                  isDense: true,
+                  onChanged: (String newValue) {
+                    setState(() {
+                      typeExercise = newValue;
+                    });
+                  },
+                  items: nameTypeExercise.map((String value) {
+                    return new DropdownMenuItem<String>(
+                      value: value,
+                      child: new Text(value),
+                    );
+                  }).toList(),
+                ),
+              ),
+            )
+          ]
+          .map((Widget child) {
+            return new Container(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              height: 96.0,
+              child: child
+            );
+          })
+          .toList()
+        )
+      ),
+    );
   }
 }

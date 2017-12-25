@@ -53,43 +53,70 @@ class _Basket extends State<Basket> {
           updateList(context);
         });
       }
-      setState(() {
-        isLoaded = true;
-      });
+      await warningMessage();
     }
   }
 
   saveCalories() {
-    dbProvider.getUserByLogin(login).then((user) {
+    httpClient.getUserByLogin(login).then((user) {
+      if (sumColories > user[0]['caloriesnorm']) {
+        var remainder = (sumColories - user[0]['caloriesnorm']) + user[0]['caloriesnorm'];
+        saveValues(remainder);
+      }
       var dateFormat = new DateFormat('yyyy-MM-dd');
       var date = dateFormat.format(new DateTime.now());
-      dbProvider.getStatisticsByDate(date).then((statByDate) {
-        if (statByDate == null) {
+      httpClient.getStatisticsByDate(date).then((statByDate) {
+        if (statByDate.isEmpty) {
           Statistics statistics = new Statistics(
             datetime: date,
-            iduser: user.iduser
+            iduser: user[0]['userid']
           );
           print(statistics.datetime);
-          dbProvider.insertStatistics(statistics).then((value) {
+          httpClient.newStatistics(statistics).then((value) {
             Calories calories = new Calories(
               caloriescount: sumColories,
-              idstatistics: value.idstatistics
+              idstatistics: value[0]['statisticsid']
             );
-            dbProvider.insertCalories(calories).then((val) {
+            httpClient.newCalories(calories).then((val) {
               Navigator.of(context).pushReplacementNamed('/statistics');
             });
           });
         } else {
           Calories calories = new Calories(
             caloriescount: sumColories,
-            idstatistics: statByDate[0]['idstatistics'],
+            idstatistics: statByDate[0]['statisticsid'],
           );
-          dbProvider.insertCalories(calories).then((val) {
-            Navigator.of(context).pushReplacementNamed('/statistics');
+          httpClient.newCalories(calories).then((val) {
+            showDialog(
+              context: context,
+              child: new AlertDialog(
+                title: new Text('Which page do you want to go to'),
+                actions: <Widget>[
+                  new FlatButton(
+                    child: new Text('Statistics'),
+                    onPressed: () {
+                      Navigator.of(context).pushReplacementNamed('/statistics');
+                    },
+                  ),
+                  new FlatButton(
+                    child: new Text('Exercise'),
+                    onPressed: () {
+                      Navigator.of(context).pushReplacementNamed('/exercise');                      
+                    },
+                  )
+                ],
+              )
+            );
           });
         }
       });
     });
+  }
+
+  saveValues(remainder) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    print(remainder);
+    prefs.setInt('remainder', remainder);
   }
 
   getValues() async {
@@ -118,6 +145,37 @@ class _Basket extends State<Basket> {
     });
   }
 
+  warningMessage() {
+    httpClient.getUserByLogin(login).then((user) async {
+      setState(() {
+        isLoaded = true;
+      });
+      if (sumColories > user[0]['caloriesnorm']) {
+        await showDialog(
+          context: context,
+          child: new AlertDialog(
+            content: new Text('You have exceeded the norm for calories. Do you want to continue?'),
+            actions: <Widget>[
+              new FlatButton(
+                child: new Text('Back'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pushReplacementNamed('/home');
+                },
+              ),
+              new FlatButton(
+                child: new Text('OK'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          )
+        );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     
@@ -132,19 +190,17 @@ class _Basket extends State<Basket> {
       )
     );
 
-    var listViewProgress = new Expanded(
-      child: new Container(
-        child: new Center(
-          child: new SizedBox(
-            height: 50.0,
-            width: 50.0,
-            child: new CircularProgressIndicator(
-              value: null,
-              strokeWidth: 7.0,
-            ),
+    var listViewProgress = new Container(
+      child: new Center(
+        child: new SizedBox(
+          height: 50.0,
+          width: 50.0,
+          child: new CircularProgressIndicator(
+            value: null,
+            strokeWidth: 7.0,
           ),
         ),
-      )
+      ),
     );
 
     var listView = new Container(
@@ -181,7 +237,7 @@ class _Basket extends State<Basket> {
         title: new Text('Basket'),
       ),
       body: new Container(
-        child: new Column(
+        child: isLoaded ? new Column(
           children: <Widget>[
             isLoaded ? listTitle : listViewProgress,
             new Row(
@@ -195,7 +251,7 @@ class _Basket extends State<Basket> {
                   ),
                 ),
                 new Container(
-                  alignment: Alignment.bottomRight,
+                  alignment: Alignment.centerRight,
                   width: MediaQuery.of(context).size.width / 2,
                   child: new Padding(
                     padding: const EdgeInsets.only(top: 5.0, bottom: 5.0, left: 10.0, right: 10.0),
@@ -235,7 +291,7 @@ class _Basket extends State<Basket> {
             //   )
             // )
           ]
-        )
+        ) : listViewProgress
       )
     );
   }
